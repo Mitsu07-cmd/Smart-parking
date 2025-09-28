@@ -336,7 +336,6 @@ def release_spot():
 @app.teardown_appcontext
 def close_connection(exception):
     """Closes the database connection at the end of the request."""
-    # 'g' is correctly imported from flask
     db = getattr(g, '_database', None)
     if db is not None:
         db.close()
