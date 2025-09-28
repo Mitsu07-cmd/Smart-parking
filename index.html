@@ -78,7 +78,7 @@
         <div class="max-w-xl bg-white shadow-xl p-6 rounded-lg">
             <h3 class="text-xl font-bold mb-2 flex items-center"><i data-lucide="server-off" class="w-6 h-6 mr-2"></i> System Error: Cannot Connect to Parking Service</h3>
             <p class="mb-4">It looks like the Python Flask server is not running or is inaccessible.</p>
-            <p class="text-sm font-semibold">Please ensure you have saved the latest <code class="bg-gray-200 p-1 rounded">app.py</code> file and run it from your terminal:</p>
+            <p class="text-sm font-semibold">Please ensure you have saved the latest <code class="bg-gray-200 p-1 rounded">app.py</code> file and run it from your terminal (or check your Render backend status):</p>
             <pre class="bg-gray-800 text-white p-3 rounded mt-2 overflow-auto">python app.py</pre>
             <button onclick="window.location.reload()" class="mt-4 bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded transition">
                 Retry Connection
@@ -206,7 +206,8 @@
         lucide.createIcons();
 
         // --- GLOBAL STATE ---
-        const SERVER_URL = 'http://127.0.0.1:5000';
+        // 🚨 IMPORTANT: Change this URL to your actual Render Web Service URL after deployment.
+        const SERVER_URL = 'https://YOUR-RENDER-SERVICE-NAME.onrender.com';
         const CORRECT_PASSWORD = 'password'; // Define the correct password globally
         let CURRENT_USER = { id: null, role: null, isPremium: false };
         let MAP_REFRESH_INTERVAL_ID = null; // To manage the refresh timer
@@ -291,7 +292,7 @@
             const totalSpots = spots.length;
             const occupiedSpots = spots.filter(s => s.is_occupied === 1).length;
             const percentage = totalSpots > 0 ? Math.round((occupiedSpots / totalSpots) * 100) : 0;
-            const circumference = 2 * Math.PI * 15.9155; // 100
+            // The circumference is 2 * Math.PI * 15.9155; // 100
 
             const circle = document.getElementById('occupancy-circle');
             const percentageText = document.getElementById('occupancy-percentage');
@@ -321,6 +322,10 @@
                 
                 const response = await fetch(`${SERVER_URL}/api/spots`);
                 if (!response.ok) {
+                    // Check for 404 specifically, but any !ok suggests server issue
+                    if (response.status === 404) {
+                        throw new Error(`Server found but API not accessible (404). Check backend routes.`);
+                    }
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 const spots = await response.json();
