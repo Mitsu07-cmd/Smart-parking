@@ -1,11 +1,7 @@
-# app.py
-# Smart Parking System Backend - Flask, SQLite, and User/Allocation Logic
-# Requires: pip install Flask flask-cors
-
 import sqlite3
 import json
 from flask import Flask, jsonify, request, g
-from flask_cors import CORS # Needed to allow the index.html file to fetch data
+from flask_cors import CORS
 
 # --- Configuration ---
 app = Flask(__name__)
@@ -101,6 +97,17 @@ def init_db():
 
 
 # --- API Endpoints ---
+
+# FIX: Added Root Route to prevent 404 error on the main URL
+@app.route('/', methods=['GET'])
+def index():
+    """Returns a simple message for the root URL/health check."""
+    return jsonify({
+        "status": "Running", 
+        "message": "Smart Parking System API is live.", 
+        "endpoints": ["/api/spots", "/api/user_info", "/api/allocate", "/api/release"]
+    })
+
 
 @app.route('/api/spots', methods=['GET'])
 def get_spots():
@@ -329,19 +336,17 @@ def release_spot():
 @app.teardown_appcontext
 def close_connection(exception):
     """Closes the database connection at the end of the request."""
-    # 'g' is now correctly imported from flask
+    # 'g' is correctly imported from flask
     db = getattr(g, '_database', None)
     if db is not None:
         db.close()
 
 if __name__ == '__main__':
-    # Initialize the database and reset spot status
+    # Initialize the database and reset spot status for local development
     init_db()
     
     print("--- Starting Flask Server ---")
-    print("Visit http://127.0.0.1:5000/api/spots to view raw data.")
-    print("Open your index.html file to view the web application.")
+    print("Visit http://127.0.0.1:5000/ to test the root endpoint.")
     
-    # Run the server
+    # Run the server (Note: Render uses Gunicorn, which replaces this)
     app.run(debug=True)
-from flask import g
