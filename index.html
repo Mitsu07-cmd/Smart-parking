@@ -206,12 +206,12 @@
         lucide.createIcons();
 
         // --- GLOBAL STATE ---
-        // 🚨 IMPORTANT: Change this URL to your actual Render Web Service URL after deployment.
-        const SERVER_URL = 'https://YOUR-RENDER-SERVICE-NAME.onrender.com';
-        const CORRECT_PASSWORD = 'password'; // Define the correct password globally
+        // 🚀 FIX APPLIED: Updated to your deployed Render URL
+        const SERVER_URL = 'https://smart-parking-etdp.onrender.com';
+        const CORRECT_PASSWORD = 'password'; 
         let CURRENT_USER = { id: null, role: null, isPremium: false };
-        let MAP_REFRESH_INTERVAL_ID = null; // To manage the refresh timer
-        let ALLOCATION_TIMEOUT_ID = null; // New global variable for the 10s auto-dismiss timer
+        let MAP_REFRESH_INTERVAL_ID = null; 
+        let ALLOCATION_TIMEOUT_ID = null; 
 
         // --- HELPER FUNCTIONS ---
 
@@ -232,14 +232,14 @@
 
         function toggleLoginControls(enable) {
             document.getElementById('user-select-input').disabled = enable; 
-            document.getElementById('password-input').disabled = enable; // NEW: Disable password input
+            document.getElementById('password-input').disabled = enable; 
             document.getElementById('login-button').disabled = enable;
             document.getElementById('allocate-button').disabled = !enable;
             
             // Re-enable input/login when user logs out
             if (!enable) {
                 document.getElementById('user-select-input').disabled = false;
-                document.getElementById('password-input').disabled = false; // NEW: Enable password input
+                document.getElementById('password-input').disabled = false; 
                 document.getElementById('login-button').disabled = false;
             }
         }
@@ -248,7 +248,7 @@
         
         function startMapRefresh() {
             if (MAP_REFRESH_INTERVAL_ID === null) {
-                // The delay is now 5 seconds (5000ms)
+                // The delay is 5 seconds (5000ms)
                 MAP_REFRESH_INTERVAL_ID = setInterval(updateParkingMap, 5000); 
             }
             console.log("Map refresh timer started.");
@@ -262,12 +262,11 @@
             console.log("Map refresh timer stopped.");
         }
         
-        // New function to handle automatic dismissal
+        // Function to handle automatic dismissal
         function autoDismissModal() {
-            // Check if the modal is still open before dismissing
             if (!document.getElementById('allocation-modal').classList.contains('hidden')) {
                 document.getElementById('allocation-modal').classList.add('hidden');
-                document.getElementById('allocation-result-box').classList.add('hidden'); // Clear persistent message
+                document.getElementById('allocation-result-box').classList.add('hidden'); 
                 startMapRefresh();
                 console.log("Allocation modal auto-dismissed after 10 seconds.");
             }
@@ -282,7 +281,7 @@
             }
             
             document.getElementById('allocation-modal').classList.add('hidden');
-            document.getElementById('allocation-result-box').classList.add('hidden'); // Clear persistent message
+            document.getElementById('allocation-result-box').classList.add('hidden'); 
             startMapRefresh();
         }
 
@@ -292,18 +291,14 @@
             const totalSpots = spots.length;
             const occupiedSpots = spots.filter(s => s.is_occupied === 1).length;
             const percentage = totalSpots > 0 ? Math.round((occupiedSpots / totalSpots) * 100) : 0;
-            // The circumference is 2 * Math.PI * 15.9155; // 100
-
             const circle = document.getElementById('occupancy-circle');
             const percentageText = document.getElementById('occupancy-percentage');
             
-            // Calculate stroke-dasharray based on percentage
             const strokeDasharray = `${percentage}, ${100 - percentage}`;
             
             circle.setAttribute('stroke-dasharray', strokeDasharray);
             percentageText.textContent = `${percentage}%`;
 
-            // Change color based on occupancy level
             let color;
             if (percentage < 30) {
                 color = '#22c55e'; // Green 500
@@ -317,15 +312,10 @@
 
         async function updateParkingMap() {
             try {
-                // Hide connection error box if it was visible
                 document.getElementById('connection-error-box').classList.add('hidden');
                 
                 const response = await fetch(`${SERVER_URL}/api/spots`);
                 if (!response.ok) {
-                    // Check for 404 specifically, but any !ok suggests server issue
-                    if (response.status === 404) {
-                        throw new Error(`Server found but API not accessible (404). Check backend routes.`);
-                    }
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 const spots = await response.json();
@@ -345,13 +335,11 @@
                     const typeClass = spot.spot_type === 'Premium' ? 'spot-premium' : 'spot-standard';
                     const premiumIcon = spot.spot_type === 'Premium' ? '<i data-lucide="crown" class="w-4 h-4 mr-1"></i>' : '';
                     
-                    // Create spot element
                     const spotEl = document.createElement('div');
                     spotEl.id = `spot-${spot.spot_id}`;
                     spotEl.className = `spot ${statusClass} ${typeClass}`;
                     spotEl.innerHTML = `${premiumIcon} ${spot.spot_type.toUpperCase()} ${spot.spot_id}`;
 
-                    // Add click handler for checkout (only if occupied)
                     if (spot.is_occupied === 1) {
                         spotEl.onclick = () => openCheckoutModal(spot.spot_id);
                         spotEl.classList.add('cursor-pointer', 'hover:opacity-80');
@@ -360,18 +348,15 @@
                         spotEl.onclick = null;
                     }
 
-                    // Append to the correct floor container
                     if (mapContainers[spot.floor]) {
                         mapContainers[spot.floor].appendChild(spotEl);
                     }
                 });
 
-                // Re-initialize Lucide icons for dynamically added elements
                 lucide.createIcons();
 
             } catch (error) {
                 console.error("Fetch Error:", error);
-                // Show the connection error box if fetch fails
                 document.getElementById('connection-error-box').classList.remove('hidden');
                 stopMapRefresh(); // Stop trying to refresh if the server is down
             }
@@ -390,7 +375,6 @@
                 return;
             }
             
-            // Password Check
             if (password !== CORRECT_PASSWORD) {
                 showMessage('error', 'Login failed: Incorrect password.');
                 passwordInput.value = ''; 
@@ -413,17 +397,15 @@
                     CURRENT_USER.role = data.role;
                     CURRENT_USER.isPremium = data.is_premium === 1;
 
-                    // Update UI
                     document.getElementById('current-user-role').textContent = data.role;
                     document.getElementById('current-user-type').textContent = data.is_premium === 1 ? 'Premium Access' : 'Standard Access';
                     showMessage('success', `Welcome, ${data.role}! You are logged in.`);
-                    toggleLoginControls(true); // Disable login, enable allocation
+                    toggleLoginControls(true); 
                     
-                    // Reset dropdown and password field after successful login
                     userSelect.value = '';
                     passwordInput.value = '';
 
-                    startMapRefresh(); // Start the live map updates only after successful login
+                    startMapRefresh(); 
 
                 } else {
                     showMessage('error', data.error || 'Login failed. Please check your User ID.');
@@ -445,7 +427,6 @@
                 return;
             }
 
-            // Stop the map refresh timer immediately before the allocation request
             stopMapRefresh();
             
             try {
@@ -461,7 +442,6 @@
                     const spotId = data.allocated_spot_id;
                     const message = data.message;
                     
-                    // 1. Immediately update the spot color without waiting for refresh
                     const spotEl = document.getElementById(`spot-${spotId}`);
                     if (spotEl) {
                         spotEl.classList.remove('spot-free');
@@ -470,23 +450,21 @@
                         spotEl.classList.add('cursor-pointer', 'hover:opacity-80');
                     }
 
-                    // 2. Show the persistent modal message
                     document.getElementById('allocated-spot-id-modal').textContent = `SPOT ${spotId}`;
                     document.getElementById('allocation-message-modal').textContent = message;
                     document.getElementById('allocation-modal').classList.remove('hidden');
 
-                    // Set 10-second automatic dismissal timer (10000ms)
                     ALLOCATION_TIMEOUT_ID = setTimeout(autoDismissModal, 10000);
 
                 } else {
                     showMessage('error', data.error || 'Allocation failed.');
-                    startMapRefresh(); // If allocation failed, restart the timer immediately
+                    startMapRefresh(); 
                 }
 
             } catch (error) {
                 showMessage('error', `Allocation failed: Could not connect to parking service. ${error.message}`);
                 console.error('Allocation Fetch Error:', error);
-                startMapRefresh(); // Restart on network error
+                startMapRefresh(); 
             }
         }
 
@@ -524,7 +502,6 @@
                 if (response.ok) {
                     showMessage('default', data.message);
                     
-                    // Immediately update the spot color in the frontend for smooth UX
                     const spotEl = document.getElementById(`spot-${spotId}`);
                     if (spotEl) {
                         spotEl.classList.remove('spot-occupied');
@@ -537,7 +514,6 @@
                     showMessage('error', data.error || 'Release failed.');
                 }
                 
-                // Trigger a map refresh to update the occupancy chart and status
                 updateParkingMap();
 
             } catch (error) {
