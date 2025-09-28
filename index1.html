@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Face track</title>
+  <style>
+    body { display:flex; flex-direction:column; align-items:center; font-family: Arial; }
+    video, canvas { border-radius: 8px; width: 640px; max-width: 95vw; }
+  </style>
+</head>
+<body>
+  <h1>Face Tracking Demo</h1>
+  <video class="input_video" playsinline></video>
+  <canvas class="output_canvas"></canvas>
+
+  <!-- MediaPipe scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+
+  <script>
+    const videoElement = document.querySelector('.input_video');
+    const canvasElement = document.querySelector('.output_canvas');
+    const canvasCtx = canvasElement.getContext('2d');
+
+    const faceMesh = new FaceMesh({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`});
+    faceMesh.setOptions({maxNumFaces:1, refineLandmarks:true, minDetectionConfidence:0.5, minTrackingConfidence:0.5});
+    faceMesh.onResults(onResults);
+
+    function onResults(results){
+      canvasCtx.save();
+      canvasCtx.clearRect(0,0,canvasElement.width,canvasElement.height);
+      canvasCtx.drawImage(results.image,0,0,canvasElement.width,canvasElement.height);
+      if(results.multiFaceLandmarks){
+        for(const landmarks of results.multiFaceLandmarks){
+          drawConnectors(canvasCtx, landmarks, FACEMESH_TESSELATION, {color:'#C0C0C070', lineWidth:1});
+          drawLandmarks(canvasCtx, landmarks, {color:'#FF3030', lineWidth:0.5});
+        }
+      }
+      canvasCtx.restore();
+    }
+
+    const camera = new Camera(videoElement, {onFrame: async ()=>{await faceMesh.send({image:videoElement});}, width:640, height:480});
+    camera.start();
+
+    videoElement.addEventListener('loadedmetadata',()=>{
+      canvasElement.width=videoElement.videoWidth;
+      canvasElement.height=videoElement.videoHeight;
+    });
+  </script>
+</body>
+</html>

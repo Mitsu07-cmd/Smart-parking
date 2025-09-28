@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Parking System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f1f5f9; /* Slate 100 */
+        }
+        .spot {
+            height: 30px;
+            width: 90%;
+            margin: 5px auto;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #1f2937; /* Gray 800 */
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.1s ease;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        .spot:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .spot-standard { background-color: #fca5a5; /* Red 300 */ }
+        .spot-premium { background-color: #a7f3d0; /* Emerald 200 */ }
+        .spot-free { background-color: #4ade80; /* Green 400 */ color: white; }
+        .spot-occupied { background-color: #ef4444; /* Red 500 */ color: white; }
+        .spot-premium.spot-free { background-color: #34d399; /* Emerald 500 */ }
+
+        /* Circular Percentage Meter Styles */
+        .circular-chart {
+            display: block;
+            margin: 10px auto;
+            max-width: 100px;
+            max-height: 100px;
+        }
+        .circle-bg {
+            fill: none;
+            stroke: #e2e8f0; /* Light background */
+            stroke-width: 3.8;
+        }
+        .circle {
+            fill: none;
+            stroke-width: 2.8;
+            stroke-linecap: round;
+            transition: stroke-dasharray .5s;
+        }
+        .percentage-text {
+            fill: #334155; /* Slate 700 */
+            font-family: sans-serif;
+            font-size: 0.5em;
+            text-anchor: middle;
+            font-weight: 700;
+        }
+        
+        /* Modal Backdrop */
+        .modal-backdrop {
+            z-index: 50;
+        }
+        .modal-container {
+            z-index: 51;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div id="connection-error-box" class="hidden fixed inset-0 bg-red-100 border-l-4 border-red-500 text-red-700 p-4 z-50 flex items-center justify-center">
+        <div class="max-w-xl bg-white shadow-xl p-6 rounded-lg">
+            <h3 class="text-xl font-bold mb-2 flex items-center"><i data-lucide="server-off" class="w-6 h-6 mr-2"></i> System Error: Cannot Connect to Parking Service</h3>
+            <p class="mb-4">It looks like the Python Flask server is not running or is inaccessible.</p>
+            <p class="text-sm font-semibold">Please ensure you have saved the latest <code class="bg-gray-200 p-1 rounded">app.py</code> file and run it from your terminal:</p>
+            <pre class="bg-gray-800 text-white p-3 rounded mt-2 overflow-auto">python app.py</pre>
+            <button onclick="window.location.reload()" class="mt-4 bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded transition">
+                Retry Connection
+            </button>
+        </div>
+    </div>
+
+    <div class="max-w-4xl mx-auto">
+        <header class="text-center mb-10">
+            <h1 class="text-4xl font-extrabold text-slate-800">Smart Parking Allocation System</h1>
+            <p class="text-slate-500 mt-2">Find the most efficient spot instantly, powered by real-time density analysis.</p>
+        </header>
+
+        <div class="bg-white p-6 rounded-xl shadow-lg mb-8 grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+            
+            <div id="login-panel" class="md:col-span-1 border-r md:pr-4">
+                <h3 class="text-lg font-semibold text-slate-700 mb-2 flex items-center">
+                    <i data-lucide="user" class="w-5 h-5 mr-2 text-blue-500"></i> User Login
+                </h3>
+                <select id="user-select-input" class="w-full p-2 border border-slate-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition mb-2">
+                    <option value="" disabled selected>Select User Role</option>
+                    <option value="101">Teacher (Premium)</option>
+                    <option value="103">Premium Student (Premium)</option>
+                    <option value="102">Standard Student</option>
+                </select>
+                <input type="password" id="password-input" placeholder="Enter Password ('password')" class="w-full p-2 border border-slate-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition mb-4">
+                <button id="login-button" onclick="loginUser()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-lg transition shadow-md">
+                    Log In
+                </button>
+            </div>
+
+            <div id="user-status-display" class="md:col-span-1 text-center md:border-r md:px-4">
+                <p class="text-xs text-slate-500 uppercase font-semibold">Logged In User</p>
+                <p id="current-user-role" class="text-xl font-bold text-slate-800">No User</p>
+                <p id="current-user-type" class="text-sm italic text-slate-500">Log in to view status.</p>
+            </div>
+
+            <div class="md:col-span-1 md:pl-4 text-center">
+                <h3 class="text-lg font-semibold text-slate-700 mb-2">
+                    Parking Action
+                </h3>
+                <button id="allocate-button" onclick="requestAllocation()" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-2 rounded-lg transition shadow-xl disabled:bg-gray-400 disabled:shadow-none mb-2" disabled>
+                    Find Most Efficient Spot
+                </button>
+                <button onclick="window.location.href='index1.html'" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 rounded-lg transition shadow-md flex items-center justify-center">
+                    <i data-lucide="layout-dashboard" class="w-5 h-5 mr-2"></i> Camera Track Demo
+                </button>
+            </div>
+        </div>
+        
+        <div class="bg-white p-6 rounded-xl shadow-lg mb-8">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-slate-800 flex items-center">
+                    <i data-lucide="parking-square" class="w-6 h-6 mr-2 text-indigo-500"></i> Live Parking Map
+                </h2>
+                <div class="flex flex-col items-center">
+                    <svg viewBox="0 0 36 36" class="circular-chart" id="occupancy-chart">
+                        <path class="circle-bg" d="M18 2.0845
+                            a 15.9155 15.9155 0 0 1 0 31.831
+                            a 15.9155 15.9155 0 0 1 0 -31.831" />
+                        <path class="circle" id="occupancy-circle"
+                            stroke="#f59e0b"
+                            stroke-dasharray="0, 100"
+                            d="M18 2.0845
+                                a 15.9155 15.9155 0 0 1 0 31.831
+                                a 15.9155 15.9155 0 0 1 0 -31.831" />
+                        <text x="18" y="20.35" class="percentage-text" id="occupancy-percentage">0%</text>
+                    </svg>
+                    <p class="text-xs text-slate-500 font-semibold">Current Occupancy</p>
+                </div>
+            </div>
+
+            <div id="allocation-result-box" class="p-3 bg-indigo-50 border-l-4 border-indigo-500 text-indigo-700 rounded-lg mb-4 hidden font-semibold">
+                </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div id="floor-Parking 1-container" class="p-4 bg-slate-50 rounded-lg shadow-inner">
+                    <h3 class="text-xl font-bold mb-4 text-center text-slate-700">Parking 1 (Closest)</h3>
+                    <div id="floor-Parking 1" class="grid grid-cols-2 gap-2">
+                        </div>
+                </div>
+
+                <div id="floor-Parking 2-container" class="p-4 bg-slate-50 rounded-lg shadow-inner">
+                    <h3 class="text-xl font-bold mb-4 text-center text-slate-700">Parking 2 (Farthest)</h3>
+                    <div id="floor-Parking 2" class="grid grid-cols-2 gap-2">
+                        </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="allocation-modal" class="hidden fixed inset-0 flex items-center justify-center bg-gray-900 bg-opacity-75 modal-backdrop">
+        <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md modal-container transform transition-transform duration-300 scale-95">
+            <h2 class="text-3xl font-extrabold text-green-600 mb-4 flex items-center">
+                <i data-lucide="check-circle" class="w-8 h-8 mr-2"></i> Spot Allocated!
+            </h2>
+            <p class="text-xl text-slate-700 font-semibold mb-2">Your Most Efficient Spot is:</p>
+            <p id="allocated-spot-id-modal" class="text-6xl font-black text-indigo-700 mb-6 bg-indigo-50 p-4 rounded-xl text-center border-2 border-dashed border-indigo-300"></p>
+            <p id="allocation-message-modal" class="text-slate-600 mb-8 italic text-sm"></p>
+            <button onclick="handleDismissModal()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg transition shadow-lg">
+                Dismiss & View Live Map
+            </button>
+        </div>
+    </div>
+
+    <div id="checkout-modal" class="hidden fixed inset-0 flex items-center justify-center bg-gray-900 bg-opacity-75 modal-backdrop">
+        <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-sm modal-container transform transition-transform duration-300 scale-95">
+            <h2 class="text-2xl font-bold text-red-600 mb-4 flex items-center">
+                <i data-lucide="log-out" class="w-6 h-6 mr-2"></i> Confirm Checkout
+            </h2>
+            <p class="text-slate-700 mb-6">Are you sure you want to release spot <span id="checkout-spot-id" class="font-bold"></span>?</p>
+            <div class="flex justify-end space-x-4">
+                <button onclick="closeCheckoutModal()" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg transition">
+                    Cancel
+                </button>
+                <button id="confirm-release-button" onclick="" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition">
+                    Confirm Release
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Initialize Lucide Icons
+        lucide.createIcons();
+
+        // --- GLOBAL STATE ---
+        const SERVER_URL = 'http://127.0.0.1:5000';
+        const CORRECT_PASSWORD = 'password'; // Define the correct password globally
+        let CURRENT_USER = { id: null, role: null, isPremium: false };
+        let MAP_REFRESH_INTERVAL_ID = null; // To manage the refresh timer
+        let ALLOCATION_TIMEOUT_ID = null; // New global variable for the 10s auto-dismiss timer
+
+        // --- HELPER FUNCTIONS ---
+
+        function showMessage(type, message) {
+            const box = document.getElementById('allocation-result-box');
+            box.textContent = message;
+            box.className = `p-3 border-l-4 rounded-lg mb-4 font-semibold`;
+            box.classList.remove('hidden');
+
+            if (type === 'success') {
+                box.classList.add('bg-green-50', 'border-green-500', 'text-green-700');
+            } else if (type === 'error') {
+                box.classList.add('bg-red-50', 'border-red-500', 'text-red-700');
+            } else {
+                 box.classList.add('bg-indigo-50', 'border-indigo-500', 'text-indigo-700');
+            }
+        }
+
+        function toggleLoginControls(enable) {
+            document.getElementById('user-select-input').disabled = enable; 
+            document.getElementById('password-input').disabled = enable; // NEW: Disable password input
+            document.getElementById('login-button').disabled = enable;
+            document.getElementById('allocate-button').disabled = !enable;
+            
+            // Re-enable input/login when user logs out
+            if (!enable) {
+                document.getElementById('user-select-input').disabled = false;
+                document.getElementById('password-input').disabled = false; // NEW: Enable password input
+                document.getElementById('login-button').disabled = false;
+            }
+        }
+
+        // --- TIMER CONTROL ---
+        
+        function startMapRefresh() {
+            if (MAP_REFRESH_INTERVAL_ID === null) {
+                // The delay is now 5 seconds (5000ms)
+                MAP_REFRESH_INTERVAL_ID = setInterval(updateParkingMap, 5000); 
+            }
+            console.log("Map refresh timer started.");
+        }
+
+        function stopMapRefresh() {
+            if (MAP_REFRESH_INTERVAL_ID !== null) {
+                clearInterval(MAP_REFRESH_INTERVAL_ID);
+                MAP_REFRESH_INTERVAL_ID = null;
+            }
+            console.log("Map refresh timer stopped.");
+        }
+        
+        // New function to handle automatic dismissal
+        function autoDismissModal() {
+            // Check if the modal is still open before dismissing
+            if (!document.getElementById('allocation-modal').classList.contains('hidden')) {
+                document.getElementById('allocation-modal').classList.add('hidden');
+                document.getElementById('allocation-result-box').classList.add('hidden'); // Clear persistent message
+                startMapRefresh();
+                console.log("Allocation modal auto-dismissed after 10 seconds.");
+            }
+            ALLOCATION_TIMEOUT_ID = null;
+        }
+
+        function handleDismissModal() {
+            // Clear the automatic timeout if the user manually dismisses it
+            if (ALLOCATION_TIMEOUT_ID !== null) {
+                clearTimeout(ALLOCATION_TIMEOUT_ID);
+                ALLOCATION_TIMEOUT_ID = null;
+            }
+            
+            document.getElementById('allocation-modal').classList.add('hidden');
+            document.getElementById('allocation-result-box').classList.add('hidden'); // Clear persistent message
+            startMapRefresh();
+        }
+
+        // --- DATA FETCHING & MAP RENDERING ---
+
+        function updateOccupancyChart(spots) {
+            const totalSpots = spots.length;
+            const occupiedSpots = spots.filter(s => s.is_occupied === 1).length;
+            const percentage = totalSpots > 0 ? Math.round((occupiedSpots / totalSpots) * 100) : 0;
+            const circumference = 2 * Math.PI * 15.9155; // 100
+
+            const circle = document.getElementById('occupancy-circle');
+            const percentageText = document.getElementById('occupancy-percentage');
+            
+            // Calculate stroke-dasharray based on percentage
+            const strokeDasharray = `${percentage}, ${100 - percentage}`;
+            
+            circle.setAttribute('stroke-dasharray', strokeDasharray);
+            percentageText.textContent = `${percentage}%`;
+
+            // Change color based on occupancy level
+            let color;
+            if (percentage < 30) {
+                color = '#22c55e'; // Green 500
+            } else if (percentage < 80) {
+                color = '#f59e0b'; // Amber 500
+            } else {
+                color = '#ef4444'; // Red 500
+            }
+            circle.setAttribute('stroke', color);
+        }
+
+        async function updateParkingMap() {
+            try {
+                // Hide connection error box if it was visible
+                document.getElementById('connection-error-box').classList.add('hidden');
+                
+                const response = await fetch(`${SERVER_URL}/api/spots`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const spots = await response.json();
+
+                updateOccupancyChart(spots);
+
+                const mapContainers = {
+                    'Parking 1': document.getElementById('floor-Parking 1'),
+                    'Parking 2': document.getElementById('floor-Parking 2'),
+                };
+
+                // Clear existing map contents
+                Object.values(mapContainers).forEach(container => container.innerHTML = '');
+
+                spots.forEach(spot => {
+                    const statusClass = spot.is_occupied === 1 ? 'spot-occupied' : 'spot-free';
+                    const typeClass = spot.spot_type === 'Premium' ? 'spot-premium' : 'spot-standard';
+                    const premiumIcon = spot.spot_type === 'Premium' ? '<i data-lucide="crown" class="w-4 h-4 mr-1"></i>' : '';
+                    
+                    // Create spot element
+                    const spotEl = document.createElement('div');
+                    spotEl.id = `spot-${spot.spot_id}`;
+                    spotEl.className = `spot ${statusClass} ${typeClass}`;
+                    spotEl.innerHTML = `${premiumIcon} ${spot.spot_type.toUpperCase()} ${spot.spot_id}`;
+
+                    // Add click handler for checkout (only if occupied)
+                    if (spot.is_occupied === 1) {
+                        spotEl.onclick = () => openCheckoutModal(spot.spot_id);
+                        spotEl.classList.add('cursor-pointer', 'hover:opacity-80');
+                    } else {
+                        spotEl.classList.remove('cursor-pointer', 'hover:opacity-80');
+                        spotEl.onclick = null;
+                    }
+
+                    // Append to the correct floor container
+                    if (mapContainers[spot.floor]) {
+                        mapContainers[spot.floor].appendChild(spotEl);
+                    }
+                });
+
+                // Re-initialize Lucide icons for dynamically added elements
+                lucide.createIcons();
+
+            } catch (error) {
+                console.error("Fetch Error:", error);
+                // Show the connection error box if fetch fails
+                document.getElementById('connection-error-box').classList.remove('hidden');
+                stopMapRefresh(); // Stop trying to refresh if the server is down
+            }
+        }
+
+        // --- USER AUTHENTICATION ---
+
+        async function loginUser() {
+            const userSelect = document.getElementById('user-select-input');
+            const passwordInput = document.getElementById('password-input');
+            const userIdString = userSelect.value.trim();
+            const password = passwordInput.value;
+
+            if (!userIdString) {
+                showMessage('error', 'Please select a user role to log in.');
+                return;
+            }
+            
+            // Password Check
+            if (password !== CORRECT_PASSWORD) {
+                showMessage('error', 'Login failed: Incorrect password.');
+                passwordInput.value = ''; 
+                return;
+            }
+            
+            const userId = parseInt(userIdString);
+
+            try {
+                const response = await fetch(`${SERVER_URL}/api/user_info`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: userId })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    CURRENT_USER.id = data.user_id;
+                    CURRENT_USER.role = data.role;
+                    CURRENT_USER.isPremium = data.is_premium === 1;
+
+                    // Update UI
+                    document.getElementById('current-user-role').textContent = data.role;
+                    document.getElementById('current-user-type').textContent = data.is_premium === 1 ? 'Premium Access' : 'Standard Access';
+                    showMessage('success', `Welcome, ${data.role}! You are logged in.`);
+                    toggleLoginControls(true); // Disable login, enable allocation
+                    
+                    // Reset dropdown and password field after successful login
+                    userSelect.value = '';
+                    passwordInput.value = '';
+
+                    startMapRefresh(); // Start the live map updates only after successful login
+
+                } else {
+                    showMessage('error', data.error || 'Login failed. Please check your User ID.');
+                    toggleLoginControls(false);
+                }
+
+            } catch (error) {
+                showMessage('error', `Login failed: Could not reach server. ${error.message}`);
+                console.error('Login Fetch Error:', error);
+            }
+        }
+
+
+        // --- ALLOCATION (Find Spot) ---
+
+        async function requestAllocation() {
+            if (!CURRENT_USER.id) {
+                showMessage('error', 'Please log in before requesting a spot.');
+                return;
+            }
+
+            // Stop the map refresh timer immediately before the allocation request
+            stopMapRefresh();
+            
+            try {
+                const response = await fetch(`${SERVER_URL}/api/allocate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: CURRENT_USER.id })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    const spotId = data.allocated_spot_id;
+                    const message = data.message;
+                    
+                    // 1. Immediately update the spot color without waiting for refresh
+                    const spotEl = document.getElementById(`spot-${spotId}`);
+                    if (spotEl) {
+                        spotEl.classList.remove('spot-free');
+                        spotEl.classList.add('spot-occupied');
+                        spotEl.onclick = () => openCheckoutModal(spotId);
+                        spotEl.classList.add('cursor-pointer', 'hover:opacity-80');
+                    }
+
+                    // 2. Show the persistent modal message
+                    document.getElementById('allocated-spot-id-modal').textContent = `SPOT ${spotId}`;
+                    document.getElementById('allocation-message-modal').textContent = message;
+                    document.getElementById('allocation-modal').classList.remove('hidden');
+
+                    // Set 10-second automatic dismissal timer (10000ms)
+                    ALLOCATION_TIMEOUT_ID = setTimeout(autoDismissModal, 10000);
+
+                } else {
+                    showMessage('error', data.error || 'Allocation failed.');
+                    startMapRefresh(); // If allocation failed, restart the timer immediately
+                }
+
+            } catch (error) {
+                showMessage('error', `Allocation failed: Could not connect to parking service. ${error.message}`);
+                console.error('Allocation Fetch Error:', error);
+                startMapRefresh(); // Restart on network error
+            }
+        }
+
+        // --- RELEASE (Checkout) ---
+
+        let spotToRelease = null;
+
+        function openCheckoutModal(spotId) {
+            if (!CURRENT_USER.id) {
+                showMessage('error', 'You must be logged in to release a spot.');
+                return;
+            }
+            spotToRelease = spotId;
+            document.getElementById('checkout-spot-id').textContent = spotId;
+            document.getElementById('confirm-release-button').onclick = () => requestRelease(spotId);
+            document.getElementById('checkout-modal').classList.remove('hidden');
+        }
+
+        function closeCheckoutModal() {
+            document.getElementById('checkout-modal').classList.add('hidden');
+            spotToRelease = null;
+        }
+
+        async function requestRelease(spotId) {
+            closeCheckoutModal(); 
+            try {
+                const response = await fetch(`${SERVER_URL}/api/release`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ spot_id: spotId })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showMessage('default', data.message);
+                    
+                    // Immediately update the spot color in the frontend for smooth UX
+                    const spotEl = document.getElementById(`spot-${spotId}`);
+                    if (spotEl) {
+                        spotEl.classList.remove('spot-occupied');
+                        spotEl.classList.add('spot-free');
+                        spotEl.onclick = null;
+                        spotEl.classList.remove('cursor-pointer', 'hover:opacity-80');
+                    }
+
+                } else {
+                    showMessage('error', data.error || 'Release failed.');
+                }
+                
+                // Trigger a map refresh to update the occupancy chart and status
+                updateParkingMap();
+
+            } catch (error) {
+                showMessage('error', `Release failed: Could not connect to server. ${error.message}`);
+                console.error('Release Fetch Error:', error);
+            }
+        }
+
+
+        // --- INITIALIZATION ---
+
+        window.onload = () => {
+            // Initial map load
+            updateParkingMap();
+        };
+
+    </script>
+</body>
+</html>
